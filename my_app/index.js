@@ -23,7 +23,7 @@ app.use(bodyParser.json());
 // view engine set
 app.set('view engine','html'); //main.html -> main(.html)
 
-// nunjucks
+// nunjucks넌적스
 nunjucks.configure('views',{
     watch: true, // html 파일이 수정될 경우, 다시 반영 후 렌더링
     express: app
