@@ -5,8 +5,7 @@ import bodyParser from 'body-parser';
 import fs from 'fs';
 import mongoose from 'mongoose';
 import Moment from 'moment';
-
-const formatNowDate = Moment().format('YYYY-MM-DD HH:mm:ss')
+import session from 'express-session';
 
 const __dirname = path.resolve();
 
@@ -19,11 +18,16 @@ const filePath = path.join(__dirname, 'data','writing.json');
 //body parser set
 app.use(bodyParser.urlencoded({ extended: false })); //express
 app.use(bodyParser.json());
+app.use(session({
+    secret: 'secret-key',
+    resave: false,
+    saveUninitialized:true,
+}));
 
 // view engine set
 app.set('view engine','html'); //main.html -> main(.html)
 
-// nunjucks넌적스
+// nunjucks
 nunjucks.configure('views',{
     watch: true, // html 파일이 수정될 경우, 다시 반영 후 렌더링
     express: app
@@ -31,13 +35,15 @@ nunjucks.configure('views',{
 
 // mongoose connect
 mongoose
-    .connect('mongodb://127.0.0.1:27017/myDatabase')
+    //.connect('mongodb://127.0.0.1:27017/myDatabase')
+    .connect('mongodb+srv://ivory0130:jeon0130@cluster0.05yt2kp.mongodb.net/example')
     .then(() => console.log('DB 연결 성공'))
     .catch((err) => console.error(err));
 
 // mongoose set
 const { Schema } = mongoose;
 
+const formatNowDate = Moment().format('YYYY-MM-DD HH:mm:ss');
 const WritingSchema = new Schema({
     title: String,
     contents: String,
@@ -45,25 +51,32 @@ const WritingSchema = new Schema({
         type: String,
         default: formatNowDate,
     }
+});
+
+const LoginSchema = new Schema({
+    userId: String,
+    password:String 
 })
 
 const Writing = mongoose.model('Writing', WritingSchema);
-
+const Login = mongoose.model('Login',LoginSchema);
 
 // middleware
 // main page GET
 app.get('/', async (req, res) => {
-    //const fileData = fs.readFileSync(filePath);
-    //const writings = JSON.parse(fileData);
+   if(!req.session.userId){
+    return res.redirect('/login');
+   }
 
     let writings = await Writing.find({})
-
-   // console.log(writings);
-    res.render('main', { list: writings});
+    res.render('main', { list: writings, userId:req.session.userId });
 
 });
 
 app.get('/write', (req,res) => {
+    if(!req.session.userId){
+        return res.redirect('/login');
+    }
     res.render('write');
 });
 
@@ -94,10 +107,10 @@ app.post('/write', async (req,res) => {
 
 
     //mongodb에 저장
-    const writing = new Writing({
-        title : title,
-        contents: contents
-    })
+        const writing = new Writing({
+            title : title,
+            contents: contents
+        })
     const result = await writing.save().then(()=> {
         console.log('Success')
         res.render('detail', { 'detail' : {title: title, contents: contents} });
@@ -156,6 +169,33 @@ app.post('/edit/:id', async (req, res) => {
     })
     
 })
+
+
+app.get('/login', (req,res) => {
+    req.session.destroy;
+    res.render('login');
+});
+
+app.post('/login', async (req,res) => {
+    const id = req.body.userId;
+    const password = req.body.password;
+    console.log(id,password);
+    const login = await Login.findOne({ userId: id ,passWord:password}).then((result) => {
+       if(result){
+         req.session.userId = id;
+         res.redirect('/');
+       }else{
+         res.render('login',{error: 'Invalid userId or password'});
+       }
+    }).catch((err) => {
+        console.error(err);
+        res.render('login', { error: 'An error occurred during login' });
+    })
+
+})
+
+
+
 
 
 app.listen(3000, ()=>{
